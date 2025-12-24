@@ -17,11 +17,12 @@ struct AlertPopupView: View {
                 VStack(alignment: .leading, spacing: 4) {
                     Text(alert.message)
                         .font(.system(size: 14, weight: .semibold))
+                        .foregroundColor(Color(red: 0.1, green: 0.1, blue: 0.1))  // Dark text for readability
                         .lineLimit(2)
 
                     Text(alert.timestamp.formatted(date: .omitted, time: .standard))
                         .font(.system(size: 12, weight: .regular))
-                        .opacity(0.7)
+                        .foregroundColor(Color(red: 0.3, green: 0.3, blue: 0.3))  // Dark gray for timestamp
                 }
 
                 Spacer()
@@ -29,7 +30,7 @@ struct AlertPopupView: View {
                 Button(action: onDismiss) {
                     Image(systemName: "xmark")
                         .font(.system(size: 12, weight: .semibold))
-                        .foregroundColor(.gray)
+                        .foregroundColor(Color(red: 0.4, green: 0.4, blue: 0.4))  // Dark gray for close button
                 }
                 .buttonStyle(.plain)
             }
@@ -76,11 +77,11 @@ struct AlertPopupView: View {
     private var backgroundColor: Color {
         switch alert.severity {
         case .mild:
-            return Color(red: 0.99, green: 0.97, blue: 0.92)
+            return Color(red: 0.98, green: 0.95, blue: 0.85)  // Darker yellow background
         case .moderate:
-            return Color(red: 1.0, green: 0.95, blue: 0.90)
+            return Color(red: 0.98, green: 0.90, blue: 0.80)  // Darker orange background
         case .severe:
-            return Color(red: 1.0, green: 0.92, blue: 0.92)
+            return Color(red: 0.95, green: 0.85, blue: 0.85)  // Darker red background
         }
     }
 }

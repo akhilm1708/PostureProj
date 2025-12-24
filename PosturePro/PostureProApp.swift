@@ -1,5 +1,6 @@
 import SwiftUI
 import AppKit
+import Combine
 
 @main
 struct PostureProApp: App {
@@ -7,26 +8,55 @@ struct PostureProApp: App {
     @StateObject var sessionManager = SessionManager()
 
     var body: some Scene {
-        Settings {
-            EmptyView()
+        WindowGroup {
+            ContentView()
+                .environmentObject(sessionManager)
+                .onAppear {
+                    // Set the sessionManager reference in AppDelegate
+                    appDelegate.sessionManager = sessionManager
+                    // Update menu bar now that sessionManager is available
+                    appDelegate.updateMenuBar()
+                    // Set up observer for session state changes
+                    appDelegate.observeSessionChanges(sessionManager: sessionManager)
+                }
+        }
+        .windowStyle(.automatic)
+        .commands {
+            CommandGroup(replacing: .newItem) {}
         }
     }
 }
 
 final class AppDelegate: NSObject, NSApplicationDelegate {
     var statusItem: NSStatusItem?
-    var sessionManager = SessionManager()
-    var historyWindow: NSWindow?
+    var sessionManager: SessionManager?
     var loginWindow: NSWindow?
 
     func applicationDidFinishLaunching(_ notification: Notification) {
-        NSApp.setActivationPolicy(.accessory)
-
+        // Set to regular app (shows in dock and allows windows)
+        NSApp.setActivationPolicy(.regular)
+        
+        // Setup menu bar
+        setupMenuBar()
+        
+        // Show login window if needed, otherwise main window will show automatically
         if !StorageService.shared.userProfileExists() {
             showLoginWindow()
-        } else {
-            setupMenuBar()
         }
+        
+        // Activate app to bring windows to front
+        NSApp.activate(ignoringOtherApps: true)
+    }
+    
+    private var cancellables = Set<AnyCancellable>()
+    
+    func observeSessionChanges(sessionManager: SessionManager) {
+        sessionManager.$isSessionActive
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] _ in
+                self?.updateMenuBar()
+            }
+            .store(in: &cancellables)
     }
 
     private func setupMenuBar() {
@@ -35,28 +65,48 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         if let button = statusItem?.button {
             button.title = "📍"
         }
-
+        
+        updateMenuBar()
+    }
+    
+    func updateMenuBar() {
         let menu = NSMenu()
 
-        let sessionTitle = sessionManager.isSessionActive ? "Stop Session" : "Start Session"
-        let sessionItem = NSMenuItem(title: sessionTitle, action: #selector(toggleSession), keyEquivalent: "")
-        menu.addItem(sessionItem)
+        // Only add session-related items if sessionManager is available
+        if let sessionManager = sessionManager {
+            let sessionTitle = sessionManager.isSessionActive ? "Stop Session" : "Start Session"
+            let sessionItem = NSMenuItem(title: sessionTitle, action: #selector(toggleSession), keyEquivalent: "")
+            sessionItem.target = self
+            menu.addItem(sessionItem)
 
-        menu.addItem(NSMenuItem.separator())
+            menu.addItem(NSMenuItem.separator())
+        }
+
+        let mainItem = NSMenuItem(title: "Main Screen", action: #selector(showMain), keyEquivalent: "m")
+        mainItem.target = self
+        menu.addItem(mainItem)
 
         let historyItem = NSMenuItem(title: "View History", action: #selector(showHistory), keyEquivalent: "h")
+        historyItem.target = self
         menu.addItem(historyItem)
+
+        menu.addItem(NSMenuItem.separator())
+        
+        let testAlertItem = NSMenuItem(title: "Test Alert", action: #selector(testAlert), keyEquivalent: "t")
+        testAlertItem.target = self
+        menu.addItem(testAlertItem)
 
         menu.addItem(NSMenuItem.separator())
 
         let quitItem = NSMenuItem(title: "Quit PostureApp", action: #selector(quitApp), keyEquivalent: "q")
+        quitItem.target = self
         menu.addItem(quitItem)
 
-        menu.items.forEach { $0.target = self }
         statusItem?.menu = menu
     }
 
     private func showLoginWindow() {
+        guard let sessionManager = sessionManager else { return }
         let loginView = LoginView(onComplete: { [weak self] in
             self?.loginWindow?.close()
             self?.loginWindow = nil
@@ -79,31 +129,52 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     @objc private func toggleSession() {
+        guard let sessionManager = sessionManager else { return }
         if sessionManager.isSessionActive {
             sessionManager.stopSession()
         } else {
             sessionManager.startSession()
         }
-        setupMenuBar()
+        updateMenuBar()
     }
 
     @objc private func showHistory() {
-        if historyWindow == nil {
-            let hosting = NSHostingView(rootView: SessionLibraryView().environmentObject(sessionManager))
-            let window = NSWindow(
-                contentRect: NSRect(x: 0, y: 0, width: 800, height: 600),
-                styleMask: [.titled, .closable, .resizable, .miniaturizable],
-                backing: .buffered,
-                defer: false
-            )
-            window.center()
-            window.title = "PostureApp – Session History"
-            window.contentView = hosting
+        guard let sessionManager = sessionManager else { return }
+        sessionManager.currentView = .history
+        // Bring main window to front - try multiple ways to find the window
+        NSApp.activate(ignoringOtherApps: true)
+        if let window = NSApplication.shared.windows.first(where: { $0.isVisible }) {
             window.makeKeyAndOrderFront(nil)
-            window.delegate = self
-            historyWindow = window
-        } else {
-            historyWindow?.makeKeyAndOrderFront(nil)
+            window.orderFrontRegardless()
+        } else if let window = NSApplication.shared.windows.first {
+            window.makeKeyAndOrderFront(nil)
+            window.orderFrontRegardless()
+        }
+    }
+    
+    @objc private func showMain() {
+        guard let sessionManager = sessionManager else { return }
+        sessionManager.currentView = .main
+        // Bring main window to front
+        NSApp.activate(ignoringOtherApps: true)
+        if let window = NSApplication.shared.windows.first(where: { $0.isVisible }) {
+            window.makeKeyAndOrderFront(nil)
+            window.orderFrontRegardless()
+        } else if let window = NSApplication.shared.windows.first {
+            window.makeKeyAndOrderFront(nil)
+            window.orderFrontRegardless()
+        }
+    }
+    
+    @objc private func testAlert() {
+        guard let sessionManager = sessionManager else { return }
+        let userName = sessionManager.userProfileName
+        sessionManager.alertViewModel.showAlert(for: userName, severity: .moderate)
+        // Also bring window to front to see the alert
+        NSApp.activate(ignoringOtherApps: true)
+        if let window = NSApplication.shared.windows.first(where: { $0.isVisible }) {
+            window.makeKeyAndOrderFront(nil)
+            window.orderFrontRegardless()
         }
     }
 
@@ -114,9 +185,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
 extension AppDelegate: NSWindowDelegate {
     func windowWillClose(_ notification: Notification) {
-        if notification.object as? NSWindow == historyWindow {
-            historyWindow = nil
-        }
         if notification.object as? NSWindow == loginWindow {
             loginWindow = nil
         }

@@ -28,58 +28,89 @@ class CameraService: NSObject, ObservableObject {
                 group.leave()
                 return
             }
-
-            self.captureSession.beginConfiguration()
-            self.captureSession.sessionPreset = .high
-
-            guard let camera = AVCaptureDevice.default(
-                .builtInWideAngleCamera,
-                for: .video,
-                position: .front
-            ) else {
-                DispatchQueue.main.async {
-                    self.cameraError = CameraError.noCameraFound
+            
+            // Check camera authorization
+            let authStatus = AVCaptureDevice.authorizationStatus(for: .video)
+            
+            if authStatus == .notDetermined {
+                // Request permission
+                AVCaptureDevice.requestAccess(for: .video) { granted in
+                    if granted {
+                        self.configureCameraSession(group: group)
+                    } else {
+                        DispatchQueue.main.async {
+                            self.cameraError = CameraError.permissionDenied
+                        }
+                        self.isConfigured = true
+                        group.leave()
+                    }
                 }
-                self.captureSession.commitConfiguration()
+                return
+            } else if authStatus != .authorized {
+                DispatchQueue.main.async {
+                    self.cameraError = CameraError.permissionDenied
+                }
                 self.isConfigured = true
                 group.leave()
                 return
             }
+            
+            // Permission granted, configure camera
+            self.configureCameraSession(group: group)
+        }
+    }
+    
+    private func configureCameraSession(group: DispatchGroup) {
+        self.captureSession.beginConfiguration()
+        self.captureSession.sessionPreset = .high
 
-            do {
-                let input = try AVCaptureDeviceInput(device: camera)
-                if self.captureSession.canAddInput(input) {
-                    self.captureSession.addInput(input)
-                }
-            } catch {
-                DispatchQueue.main.async {
-                    self.cameraError = error
-                }
-                self.captureSession.commitConfiguration()
-                self.isConfigured = true
-                group.leave()
-                return
+        guard let camera = AVCaptureDevice.default(
+            .builtInWideAngleCamera,
+            for: .video,
+            position: .front
+        ) else {
+            DispatchQueue.main.async {
+                self.cameraError = CameraError.noCameraFound
             }
-
-            let videoOutput = AVCaptureVideoDataOutput()
-            videoOutput.setSampleBufferDelegate(self, queue: DispatchQueue(label: "com.postureapp.video"))
-            videoOutput.videoSettings = [kCVPixelBufferPixelFormatTypeKey as String: NSNumber(value: kCVPixelFormatType_32BGRA)]
-
-            if self.captureSession.canAddOutput(videoOutput) {
-                self.captureSession.addOutput(videoOutput)
-                self.videoOutput = videoOutput
-            }
-
-            let movieOutput = AVCaptureMovieFileOutput()
-            if self.captureSession.canAddOutput(movieOutput) {
-                self.captureSession.addOutput(movieOutput)
-                self.movieFileOutput = movieOutput
-            }
-
             self.captureSession.commitConfiguration()
             self.isConfigured = true
             group.leave()
+            return
         }
+
+        do {
+            let input = try AVCaptureDeviceInput(device: camera)
+            if self.captureSession.canAddInput(input) {
+                self.captureSession.addInput(input)
+            }
+        } catch {
+            DispatchQueue.main.async {
+                self.cameraError = error
+            }
+            self.captureSession.commitConfiguration()
+            self.isConfigured = true
+            group.leave()
+            return
+        }
+
+        let videoOutput = AVCaptureVideoDataOutput()
+        videoOutput.setSampleBufferDelegate(self, queue: DispatchQueue(label: "com.postureapp.video"))
+        videoOutput.videoSettings = [kCVPixelBufferPixelFormatTypeKey as String: NSNumber(value: kCVPixelFormatType_32BGRA)]
+
+        if self.captureSession.canAddOutput(videoOutput) {
+            self.captureSession.addOutput(videoOutput)
+            self.videoOutput = videoOutput
+        }
+
+        let movieOutput = AVCaptureMovieFileOutput()
+        if self.captureSession.canAddOutput(movieOutput) {
+            self.captureSession.addOutput(movieOutput)
+            self.movieFileOutput = movieOutput
+        }
+
+        self.captureSession.commitConfiguration()
+        self.isConfigured = true
+        group.leave()
     }
 
     func startCapture() {

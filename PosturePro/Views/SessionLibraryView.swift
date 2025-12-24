@@ -7,11 +7,36 @@ struct SessionLibraryView: View {
     @State private var sessions: [SessionModel] = []
 
     var body: some View {
-        NavigationSplitView {
+        VStack(spacing: 0) {
+            // Header with back button
+            HStack {
+                Button(action: {
+                    sessionManager.currentView = .main
+                }) {
+                    HStack {
+                        Image(systemName: "chevron.left")
+                        Text("Back")
+                    }
+                }
+                .buttonStyle(.plain)
+                
+                Spacer()
+                
+                Text("Session History")
+                    .font(.headline)
+                
+                Spacer()
+                
+                // Spacer to balance the back button
+                Text("")
+                    .frame(width: 60)
+            }
+            .padding()
+            .background(Color(NSColor.controlBackgroundColor))
+            
+            NavigationSplitView {
             VStack(spacing: 0) {
                 VStack(alignment: .leading, spacing: 8) {
-                    Text("Session History")
-                        .font(.headline)
                     Text("\(sessions.count) sessions recorded")
                         .font(.caption)
                         .foregroundColor(.gray)
@@ -78,6 +103,7 @@ struct SessionLibraryView: View {
                         .multilineTextAlignment(.center)
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
+            }
             }
         }
     }

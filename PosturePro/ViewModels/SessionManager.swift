@@ -7,6 +7,7 @@ final class SessionManager: ObservableObject {
     @Published var sessionDuration: TimeInterval = 0
     @Published var sessionMinutes = 0
     @Published var sessionSeconds = 0
+    @Published var currentView: AppView = .main
 
     let cameraService = CameraService()
     let visionService = VisionService()
@@ -18,6 +19,11 @@ final class SessionManager: ObservableObject {
     private var postureEvents: [PostureEvent] = []
     private var slouchBuffer: SlouchBuffer?
     private var userProfile: UserProfile?
+    
+    // Public accessor for user profile
+    var userProfileName: String {
+        return userProfile?.name ?? "User"
+    }
 
     private var cancellables = Set<AnyCancellable>()
     private var timerCancellable: AnyCancellable?

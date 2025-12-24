@@ -22,9 +22,15 @@ class AlertViewModel: ObservableObject {
             timestamp: Date()
         )
 
+        // Update published properties for in-app display
         withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
             self.currentAlert = alert
             self.isShowingAlert = true
+        }
+        
+        // Show floating window at screen bottom-right
+        AlertWindowManager.shared.showAlert(alert) { [weak self] in
+            self?.dismissAlert()
         }
 
         dismissTimer?.invalidate()
@@ -39,6 +45,7 @@ class AlertViewModel: ObservableObject {
             self.currentAlert = nil
         }
         dismissTimer?.invalidate()
+        AlertWindowManager.shared.dismissAlert()
     }
 }
 

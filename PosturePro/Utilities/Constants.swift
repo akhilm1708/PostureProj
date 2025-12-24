@@ -7,7 +7,7 @@ struct Constants {
     static let HEAD_FORWARD_THRESHOLD = 0.15
 
     // MARK: - Alert System Timing (seconds)
-    static let SLOUCH_BUFFER_TIME = 15.0
+    static let SLOUCH_BUFFER_TIME = 5.0  // Changed to 5 seconds for testing
     static let ALERT_DISPLAY_DURATION = 4.0
     static let ALERT_ANIMATION_DURATION = 0.3
 
